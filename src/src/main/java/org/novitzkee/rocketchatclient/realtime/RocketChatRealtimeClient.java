@@ -137,7 +137,7 @@ public class RocketChatRealtimeClient {
         return performCall(new Connect());
     }
 
-    private <M extends DdpMessage, T> CompletableFuture<T> performCall(SynchronousCall<M, T> call) {
+    private <T> CompletableFuture<T> performCall(SynchronousCall<?, T> call) {
         final String outgoingMessage = MOSHI.<SynchronousCall<?, ?>>adapter(call.getClass()).toJson(call);
 
         final WebSocket ws = webSocket;
