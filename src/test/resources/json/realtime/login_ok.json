@@ -1,0 +1,9 @@
+{
+  "msg": "result",
+  "id": "1",
+  "result": {
+    "id": "testUserId",
+    "token": "testAuthToken",
+    "type": "resume"
+  }
+}

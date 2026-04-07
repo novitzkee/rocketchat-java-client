@@ -1,0 +1,11 @@
+{
+  "msg": "result",
+  "id": "1",
+  "error": {
+    "isClientSafe": true,
+    "errorType": "Meteor.Error",
+    "error": 403,
+    "reason": "You've been logged out by the server. Please log in again",
+    "message": "You've been logged out by the server. Please log in again [403]"
+  }
+}

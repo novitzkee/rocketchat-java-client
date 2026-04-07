@@ -1,7 +1,7 @@
-package org.novitzkee.rocketchatclient;
+package org.novitzkee.rocketchatclient.util;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -9,14 +9,9 @@ import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-class RocketChatIntegrationTest {
+public class RocketChatIntegrationTest {
 
     private static final DockerImageName MONGO_8 = DockerImageName.parse("mongo:8.0");
 
@@ -28,14 +23,14 @@ class RocketChatIntegrationTest {
 
     private static final int ROCKET_CHAT_PORT = 3000;
 
-    private static final MongoDBContainer MONGO_DB = new MongoDBContainer(MONGO_8)
+    static final MongoDBContainer MONGO_DB = new MongoDBContainer(MONGO_8)
             .withNetwork(NETWORK)
             .withNetworkAliases(MONGO_NETWORK_ALIAS)
             .withReplicaSet()
             .withCommand("--replSet rs --oplogSize 128 --bind_ip_all")
             .withReuse(true);
 
-    private static final GenericContainer<?> ROCKET_CHAT = new GenericContainer<>(ROCKET_CHAT_8)
+   static final GenericContainer<?> ROCKET_CHAT = new GenericContainer<>(ROCKET_CHAT_8)
             .withNetwork(NETWORK)
             .withExposedPorts(ROCKET_CHAT_PORT)
             .dependsOn(MONGO_DB)
@@ -55,26 +50,15 @@ class RocketChatIntegrationTest {
         ROCKET_CHAT.start();
     }
 
-    @Test
-    void shouldRetrieveAPIStatus() throws Exception {
-        // given
-        final HttpClient httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
-
-        final URI requestUri = new URI(getRocketChatBaseUrl() + "/api/info");
-        final HttpRequest apiInfoRequest = HttpRequest.newBuilder(requestUri)
-                .GET()
-                .build();
-
-        // when
-        final HttpResponse<String> response = httpClient.send(apiInfoRequest, HttpResponse.BodyHandlers.ofString());
-
-        // then
-        assertThat(response.statusCode()).isEqualTo(200);
+    @SneakyThrows
+    protected URI rocketChatHttpUrl() {
+        final String uri = String.format("http://%s:%d/", ROCKET_CHAT.getHost(), ROCKET_CHAT.getMappedPort(ROCKET_CHAT_PORT));
+        return new URI(uri);
     }
 
-    private String getRocketChatBaseUrl() {
-        return String.format("http://%s:%d", ROCKET_CHAT.getHost(), ROCKET_CHAT.getMappedPort(ROCKET_CHAT_PORT));
+    @SneakyThrows
+    protected URI rocketChatWebsocketUrl() {
+        final String uri = String.format("ws://%s:%d/", ROCKET_CHAT.getHost(), ROCKET_CHAT.getMappedPort(ROCKET_CHAT_PORT));
+        return new URI(uri);
     }
 }
