@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.novitzkee.rocketchatclient.realtime.common.DdpMessageType;
+import org.novitzkee.rocketchatclient.realtime.common.MethodName;
+import org.novitzkee.rocketchatclient.realtime.method.Login;
 import org.novitzkee.rocketchatclient.realtime.util.RocketChatRealtimeClientException;
 
 import java.net.URI;
@@ -18,11 +20,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeTestResponses.OK_CONNECT_MESSAGE;
-import static org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeTestResponses.PING_MESSAGE;
+import static org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeTestResponses.*;
 
 class RocketChatRealtimeClientTest {
 
+    // TODO: Load all test responses from file.
     private static final String CONNECT_MESSAGE = "{\"msg\":\"connect\",\"support\":[\"1\"],\"version\":\"1\"}";
 
     private static final String PONG_MESSAGE = "{\"msg\":\"pong\"}";
@@ -115,9 +117,33 @@ class RocketChatRealtimeClientTest {
                 );
     }
 
+    @Test
+    void shouldLoginToRealtimeAPI() throws Exception {
+        // given
+        setUpOkConnectResponse();
+        setUpOkLoginResponse();
+
+        final Login login = Login.usingAuthenticationToken("test-token");
+
+        // when
+        final String session = rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
+        final Login.Result result = rocketChatRealtimeClient.performMethodCall(login).get(1L, TimeUnit.SECONDS);
+
+        // then
+        assertThat(session).isNotBlank();
+        assertThat(result.id()).isNotBlank();
+    }
+
     private void setUpOkConnectResponse() {
         when(webSocketMock.sendText(contains(DdpMessageType.CONNECT.value()), eq(true))).thenAnswer(ignored -> {
             SMALL_DELAY_EXECUTOR.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, OK_CONNECT_MESSAGE, true));
+            return CompletableFuture.completedFuture(webSocketMock);
+        });
+    }
+
+    private void setUpOkLoginResponse() {
+        when(webSocketMock.sendText(contains(MethodName.LOGIN.value()), eq(true))).thenAnswer(ignored -> {
+            SMALL_DELAY_EXECUTOR.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, OK_LOGIN_MESSAGE, true));
             return CompletableFuture.completedFuture(webSocketMock);
         });
     }

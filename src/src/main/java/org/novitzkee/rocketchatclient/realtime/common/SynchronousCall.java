@@ -1,10 +1,13 @@
 package org.novitzkee.rocketchatclient.realtime.common;
 
-public interface SynchronousCall<M extends DdpMessage, R> extends DdpMessage {
+import com.squareup.moshi.JsonAdapter;
+import com.squareup.moshi.Moshi;
 
-    CallId getId();
+public interface SynchronousCall<M extends DdpMessage, R> {
 
-    Class<M> getResponseMessageClass();
+    CallId id();
 
-    R getResult(M responseMessage);
+    JsonAdapter<M> responseJsonAdapter(Moshi moshi);
+
+    R getResult(M response);
 }

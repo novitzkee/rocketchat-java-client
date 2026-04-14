@@ -8,6 +8,7 @@ import org.jspecify.annotations.Nullable;
 import org.novitzkee.rocketchatclient.realtime.common.*;
 import org.novitzkee.rocketchatclient.realtime.json.CallIdAdapter;
 import org.novitzkee.rocketchatclient.realtime.json.MessageTypeAdapter;
+import org.novitzkee.rocketchatclient.realtime.json.MethodNameAdapter;
 import org.novitzkee.rocketchatclient.realtime.message.Connect;
 import org.novitzkee.rocketchatclient.realtime.message.Pong;
 import org.novitzkee.rocketchatclient.realtime.util.PendingSynchronousCall;
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Slf4j
 // TODO: Review concurrency correctness in more detail.
+// TODO: Add recovery policy for connection failures.
 public class RocketChatRealtimeClient {
 
     private static final Duration DEFAULT_CALL_TIMEOUT = Duration.ofSeconds(10);
@@ -41,6 +43,7 @@ public class RocketChatRealtimeClient {
     private static final Moshi MOSHI = new Moshi.Builder()
             .add(new CallIdAdapter())
             .add(new MessageTypeAdapter())
+            .add(new MethodNameAdapter())
             .build();
 
     private final URI apiUrl;
@@ -72,7 +75,7 @@ public class RocketChatRealtimeClient {
         this.synchronousCallsInProgress = Caffeine.newBuilder()
                 .expireAfterWrite(callTimeoutDuration == null ? DEFAULT_CALL_TIMEOUT : callTimeoutDuration)
                 .maximumSize(1_000)
-                .removalListener(new CallTimeoutListener())
+                .removalListener(new PendingCallRemovalListener())
                 .scheduler(Scheduler.systemScheduler())
                 .build();
     }
@@ -88,8 +91,8 @@ public class RocketChatRealtimeClient {
         return doConnect().whenComplete((v, e) -> connectMutex.release());
     }
 
-    public <T> CompletableFuture<T> performMethodCall(MethodCall<?, T> methodCall) {
-        methodCall.setId(CallId.of(idCounter.incrementAndGet()));
+    public <T> CompletableFuture<T> performMethodCall(MethodCall<T> methodCall) {
+        methodCall.id(CallId.of(idCounter.incrementAndGet()));
         return performCall(methodCall);
     }
 
@@ -150,6 +153,7 @@ public class RocketChatRealtimeClient {
         final Exception failure = connectionFailure;
         if (failure != null) {
             pendingCall.completeExceptionally(failure);
+            return pendingCall.getResult();
         }
 
         synchronousCallsInProgress.put(pendingCall.getId(), pendingCall);
@@ -168,8 +172,8 @@ public class RocketChatRealtimeClient {
             sendPong();
         } else if (DdpMessageType.CONNECTED.equals(ddpMessageType)) {
             finishPendingCall(Connect.CONNECT_MSG_ID, message);
-        } else {
-            final String id = MethodCall.CALL_ID_PATH.read(message);
+        } else if (DdpMessageType.RESULT.equals(ddpMessageType)) {
+            final String id = MethodResponse.CALL_ID_PATH.read(message);
             final CallId callId = CallId.fromString(id);
             finishPendingCall(callId, message);
         }
@@ -198,7 +202,7 @@ public class RocketChatRealtimeClient {
         synchronousCallsInProgress.invalidateAll();
     }
 
-    private static class CallTimeoutListener implements RemovalListener<@NonNull Object, @NonNull PendingSynchronousCall<?, ?>> {
+    private static class PendingCallRemovalListener implements RemovalListener<@NonNull Object, @NonNull PendingSynchronousCall<?, ?>> {
 
         @Override
         public void onRemoval(

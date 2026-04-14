@@ -1,13 +1,18 @@
 package org.novitzkee.rocketchatclient.realtime.message;
 
+import com.squareup.moshi.JsonAdapter;
+import com.squareup.moshi.Moshi;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.Accessors;
 import org.novitzkee.rocketchatclient.realtime.common.CallId;
 import org.novitzkee.rocketchatclient.realtime.common.DdpMessage;
 import org.novitzkee.rocketchatclient.realtime.common.DdpMessageType;
 import org.novitzkee.rocketchatclient.realtime.common.SynchronousCall;
-import org.novitzkee.rocketchatclient.realtime.util.CallUtil;
 
 @Getter
+@Accessors(fluent = true, makeFinal = true)
+@RequiredArgsConstructor
 public class Connect implements SynchronousCall<Connected, String>, DdpMessage {
 
     public static final CallId CONNECT_MSG_ID = CallId.of(0);
@@ -19,18 +24,17 @@ public class Connect implements SynchronousCall<Connected, String>, DdpMessage {
     private final String[] support = {"1"};
 
     @Override
-    public CallId getId() {
+    public CallId id() {
         return CONNECT_MSG_ID;
     }
 
     @Override
-    public Class<Connected> getResponseMessageClass() {
-        return Connected.class;
+    public JsonAdapter<Connected> responseJsonAdapter(Moshi moshi) {
+        return moshi.adapter(Connected.class);
     }
 
     @Override
     public String getResult(Connected connectedMessage) {
-        CallUtil.expectMessageOfType(connectedMessage, DdpMessageType.CONNECTED);
-        return connectedMessage.getSession();
+        return connectedMessage.session();
     }
 }

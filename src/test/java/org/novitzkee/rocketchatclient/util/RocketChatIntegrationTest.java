@@ -30,7 +30,7 @@ public class RocketChatIntegrationTest {
             .withCommand("--replSet rs --oplogSize 128 --bind_ip_all")
             .withReuse(true);
 
-   static final GenericContainer<?> ROCKET_CHAT = new GenericContainer<>(ROCKET_CHAT_8)
+    static final GenericContainer<?> ROCKET_CHAT = new GenericContainer<>(ROCKET_CHAT_8)
             .withNetwork(NETWORK)
             .withExposedPorts(ROCKET_CHAT_PORT)
             .dependsOn(MONGO_DB)

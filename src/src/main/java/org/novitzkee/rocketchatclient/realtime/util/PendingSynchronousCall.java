@@ -21,32 +21,32 @@ public class PendingSynchronousCall<M extends DdpMessage, R> {
     private final CompletableFuture<R> result;
 
     public static <M extends DdpMessage, T> PendingSynchronousCall<M, T> start(SynchronousCall<M, T> call) {
-        log.debug("STARTING method call with id: {} and class: {}", call.getId(), call.getClass().getSimpleName());
+        log.debug("STARTING method call with id: {} and class: {}", call.id(), call.getClass().getSimpleName());
         return new PendingSynchronousCall<>(call, new CompletableFuture<>());
     }
 
     public void complete(String receivedJson, Moshi moshi) {
         try {
-            final M message = moshi.adapter(call.getResponseMessageClass()).fromJson(receivedJson);
+            final M message = call.responseJsonAdapter(moshi).fromJson(receivedJson);
             final R result = call.getResult(message);
             this.result.complete(result);
-            log.debug("COMPLETING method call with class: {} with id: {} with result: {}", getCallClassName(), call.getId(), result);
+            log.debug("COMPLETING method call with class: {} with id: {} with result: {}", getCallClassName(), call.id(), result);
         } catch (Exception e) {
-            log.debug("COMPLETING method call with class: {} with id: {} with exception", getCallClassName(), call.getId(), e);
+            log.debug("COMPLETING method call with class: {} with id: {} with exception", getCallClassName(), call.id(), e);
             result.completeExceptionally(e);
         }
     }
 
     public void completeExceptionally(Exception e) {
-        log.debug("COMPLETING method call with class: {} with id: {} with exception", getCallClassName(), call.getId(), e);
+        log.debug("COMPLETING method call with class: {} with id: {} with exception", getCallClassName(), call.id(), e);
         result.completeExceptionally(e);
     }
 
     public CallId getId() {
-        return call.getId();
+        return call.id();
     }
 
-    public String getCallClassName() {
+    private String getCallClassName() {
         return call.getClass()
                 .getSimpleName();
     }

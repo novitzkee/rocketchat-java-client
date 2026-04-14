@@ -1,16 +1,41 @@
 package org.novitzkee.rocketchatclient.realtime.common;
 
-import com.jayway.jsonpath.JsonPath;
+import com.squareup.moshi.JsonAdapter;
+import com.squareup.moshi.Moshi;
+import com.squareup.moshi.Types;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.Accessors;
+
+import java.lang.reflect.Type;
 
 @Getter
-public abstract class MethodCall<M extends DdpMessage, R> implements SynchronousCall<M, R>, DdpMessage {
+@Accessors(fluent = true, makeFinal = true)
+@RequiredArgsConstructor(access = AccessLevel.PROTECTED)
+public abstract class MethodCall<R> implements SynchronousCall<MethodResponse<R>, R>, DdpMessage {
 
-    public static final JsonPath CALL_ID_PATH = JsonPath.compile("$.id");
+    private final DdpMessageType msg = DdpMessageType.METHOD;
 
     @Setter
     private CallId id;
 
-    private final DdpMessageType msg = DdpMessageType.METHOD;
+    private final MethodName method;
+
+    private final Object[] params;
+
+    @Override
+    public final JsonAdapter<MethodResponse<R>> responseJsonAdapter(Moshi moshi) {
+        final Type fullResponseType = Types.newParameterizedType(MethodResponse.class, resultClass());
+        return moshi.adapter(fullResponseType);
+    }
+
+    @Override
+    // TODO: Throw MethodCallException if error is present in response
+    public final R getResult(MethodResponse<R> responseMessage) {
+        return responseMessage.result();
+    }
+
+    protected abstract Class<R> resultClass();
 }
