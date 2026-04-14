@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeMethodCallException;
 
 import java.lang.reflect.Type;
 
@@ -32,8 +33,11 @@ public abstract class MethodCall<R> implements SynchronousCall<MethodResponse<R>
     }
 
     @Override
-    // TODO: Throw MethodCallException if error is present in response
     public final R getResult(MethodResponse<R> responseMessage) {
+        if (responseMessage.error() != null) {
+            throw RocketChatRealtimeMethodCallException.fromErrorResponse(responseMessage.error());
+        }
+
         return responseMessage.result();
     }
 

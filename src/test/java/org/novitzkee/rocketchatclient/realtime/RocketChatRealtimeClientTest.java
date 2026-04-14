@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.novitzkee.rocketchatclient.realtime.common.DdpMessageType;
 import org.novitzkee.rocketchatclient.realtime.common.MethodName;
+import org.novitzkee.rocketchatclient.realtime.common.MethodResponse;
+import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
+import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeMethodCallException;
 import org.novitzkee.rocketchatclient.realtime.method.authentication.Login;
-import org.novitzkee.rocketchatclient.realtime.util.RocketChatRealtimeClientException;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -125,7 +127,7 @@ class RocketChatRealtimeClientTest {
     void shouldLoginToRealtimeAPI() throws Exception {
         // given
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
-        setUpMethodResponse(SMALL_DELAY_EXECUTOR, MethodName.LOGIN, LOGIN_OK_RESPONSE);
+        setUpMethodResponse(SMALL_DELAY_EXECUTOR, MethodName.LOGIN, RocketChatRealtimeMessages::loginOkResponse);
 
         final Login login = Login.usingAuthenticationToken("test-token");
 
@@ -140,6 +142,34 @@ class RocketChatRealtimeClientTest {
         assertThat(result.type()).isNotNull();
     }
 
+    @Test
+    void shouldCompleteLoginWithMethodCallExceptionWhenErrorIsReceived() throws Exception {
+        // given
+        setUpConnectResponse(SMALL_DELAY_EXECUTOR);
+        setUpMethodResponse(SMALL_DELAY_EXECUTOR, MethodName.LOGIN, RocketChatRealtimeMessages::loginErrorResponse);
+
+        final Login login = Login.usingAuthenticationToken("test-token");
+
+        // when
+        rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
+        final CompletableFuture<Login.Info> loginFuture = rocketChatRealtimeClient.performMethodCall(login);
+
+        // then
+        await().atMost(2L, TimeUnit.SECONDS)
+                .until(loginFuture::isDone);
+
+        assertThatThrownBy(loginFuture::join).isInstanceOf(CompletionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                        RocketChatRealtimeMethodCallException.class,
+                        e -> {
+                            assertThat(e.getError()).isEqualTo(403);
+                            assertThat(e.getErrorType()).isEqualTo("Meteor.Error");
+                            assertThat(e.getMessage()).contains("Please log in again");
+                        }
+                );
+    }
+
     private void setUpConnectResponse(Executor executor) {
         when(webSocketMock.sendText(ddpMessageOfType(DdpMessageType.CONNECT), eq(true))).thenAnswer(ignored -> {
             executor.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, CONNECTED_MESSAGE, true));
@@ -147,9 +177,11 @@ class RocketChatRealtimeClientTest {
         });
     }
 
-    private void setUpMethodResponse(Executor executor, MethodName calledMethodName, String response) {
-        when(webSocketMock.sendText(methodCallWithName(calledMethodName), eq(true))).thenAnswer(ignored -> {
-            executor.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, response, true));
+    private void setUpMethodResponse(Executor executor, MethodName calledMethodName, ResponseProvider provider) {
+        when(webSocketMock.sendText(methodCallWithName(calledMethodName), eq(true))).thenAnswer(invocation -> {
+            final String request = invocation.getArgument(0);
+            final String callId = MethodResponse.CALL_ID_PATH.read(request);
+            executor.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, provider.createForId(callId), true));
             return CompletableFuture.completedFuture(webSocketMock);
         });
     }
@@ -169,5 +201,10 @@ class RocketChatRealtimeClientTest {
         final HttpClient httpClientMock = mock(HttpClient.class);
         when(httpClientMock.newWebSocketBuilder()).thenReturn(webSocketBuilderMock);
         return httpClientMock;
+    }
+
+    @FunctionalInterface
+    private interface ResponseProvider {
+        String createForId(String callId);
     }
 }

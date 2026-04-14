@@ -1,6 +1,6 @@
 {
   "msg": "result",
-  "id": "1",
+  "id": "{callId}",
   "result": {
     "id": "LFdhbcNHx5zsMA7T4",
     "token": "5BwhTeEXiTmU_8uKxGuy4pqWRHRP73QpJYmoSWfBpcB",

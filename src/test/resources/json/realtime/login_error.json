@@ -1,6 +1,6 @@
 {
   "msg": "result",
-  "id": "1",
+  "id": "{callId}",
   "error": {
     "isClientSafe": true,
     "errorType": "Meteor.Error",

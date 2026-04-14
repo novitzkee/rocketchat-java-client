@@ -13,7 +13,7 @@ import org.novitzkee.rocketchatclient.realtime.json.MethodNameAdapter;
 import org.novitzkee.rocketchatclient.realtime.message.Connect;
 import org.novitzkee.rocketchatclient.realtime.message.Pong;
 import org.novitzkee.rocketchatclient.realtime.util.PendingSynchronousCall;
-import org.novitzkee.rocketchatclient.realtime.util.RocketChatRealtimeClientException;
+import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
 import org.novitzkee.rocketchatclient.realtime.util.WebSocketMessageBuffer;
 
 import java.net.URI;

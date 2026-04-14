@@ -16,5 +16,5 @@ public class MethodResponse<R> implements DdpMessage {
 
     private Error error;
 
-    public record Error(long error, String reason, String message, String errorType) {  }
+    public record Error(int error, String reason, String message, String errorType) {  }
 }

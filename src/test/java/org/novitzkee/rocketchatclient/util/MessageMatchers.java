@@ -18,7 +18,7 @@ public class MessageMatchers {
 
     public static String methodCallWithName(MethodName methodName) {
         return argThat(jsonMessage -> StringUtils.isNotBlank(jsonMessage) &&
-                Objects.equals(DdpMessageType.METHOD, DdpMessageType.DDP_MESSAGE_TYPE_PATH.read(jsonMessage)) &&
+                Objects.equals(DdpMessageType.METHOD.value(), DdpMessageType.DDP_MESSAGE_TYPE_PATH.read(jsonMessage)) &&
                 Objects.equals(methodName.value(), METHOD_NAME_PATH.read(jsonMessage))
         );
     }

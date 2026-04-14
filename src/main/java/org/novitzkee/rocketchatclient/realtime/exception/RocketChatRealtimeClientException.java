@@ -1,4 +1,4 @@
-package org.novitzkee.rocketchatclient.realtime.util;
+package org.novitzkee.rocketchatclient.realtime.exception;
 
 public class RocketChatRealtimeClientException extends RuntimeException {
 
