@@ -1,4 +1,4 @@
-package org.novitzkee.rocketchatclient.util;
+package org.novitzkee.rocketchatclient.integration;
 
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeAll;
@@ -11,7 +11,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.net.URI;
 import java.time.Duration;
 
-public class RocketChatIntegrationTest {
+public abstract class RocketChatIntegrationTest {
 
     private static final DockerImageName MONGO_8 = DockerImageName.parse("mongo:8.0");
 

@@ -1,7 +1,6 @@
-package org.novitzkee.rocketchatclient.rest;
+package org.novitzkee.rocketchatclient.integration;
 
 import org.junit.jupiter.api.Test;
-import org.novitzkee.rocketchatclient.util.RocketChatIntegrationTest;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -13,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Work in progress.
  */
-public class RocketChatRestClientIntegrationTest extends RocketChatIntegrationTest {
+public class RocketChatRestClientIT extends RocketChatIntegrationTest {
 
     @Test
     void shouldRetrieveAPIStatus() throws Exception {

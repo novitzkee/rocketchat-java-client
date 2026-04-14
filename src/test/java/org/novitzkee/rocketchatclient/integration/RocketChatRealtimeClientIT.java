@@ -1,8 +1,8 @@
-package org.novitzkee.rocketchatclient.realtime;
+package org.novitzkee.rocketchatclient.integration;
 
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
-import org.novitzkee.rocketchatclient.util.RocketChatIntegrationTest;
+import org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -10,7 +10,7 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Slf4j
-class RocketChatRealtimeClientIntegrationTest extends RocketChatIntegrationTest {
+class RocketChatRealtimeClientIT extends RocketChatIntegrationTest {
 
     private static final String ROCKET_CHAT_REALTIME_API_PATH = "websocket";
 
