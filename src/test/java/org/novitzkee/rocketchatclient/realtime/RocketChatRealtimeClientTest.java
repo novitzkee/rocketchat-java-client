@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.novitzkee.rocketchatclient.realtime.common.DdpMessageType;
 import org.novitzkee.rocketchatclient.realtime.common.MethodName;
-import org.novitzkee.rocketchatclient.realtime.method.Login;
+import org.novitzkee.rocketchatclient.realtime.method.authentication.Login;
 import org.novitzkee.rocketchatclient.realtime.util.RocketChatRealtimeClientException;
 
 import java.net.URI;
@@ -58,7 +58,7 @@ class RocketChatRealtimeClientTest {
     }
 
     @Test
-    void shouldConnectToRocketChatRealtimeAPI() throws ExecutionException, InterruptedException, TimeoutException {
+    void shouldConnectToRocketChatRealtimeAPI() throws Exception {
         // given
         setUpOkConnectResponse();
 
@@ -126,12 +126,14 @@ class RocketChatRealtimeClientTest {
         final Login login = Login.usingAuthenticationToken("test-token");
 
         // when
-        final String session = rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
-        final Login.Result result = rocketChatRealtimeClient.performMethodCall(login).get(1L, TimeUnit.SECONDS);
+        rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
+        final Login.Info result = rocketChatRealtimeClient.performMethodCall(login).get(1L, TimeUnit.SECONDS);
 
         // then
-        assertThat(session).isNotBlank();
         assertThat(result.id()).isNotBlank();
+        assertThat(result.token()).isNotBlank();
+        assertThat(result.tokenExpires()).isNotNull();
+        assertThat(result.type()).isNotNull();
     }
 
     private void setUpOkConnectResponse() {

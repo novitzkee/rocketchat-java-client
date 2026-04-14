@@ -2,8 +2,11 @@
   "msg": "result",
   "id": "1",
   "result": {
-    "id": "testUserId",
-    "token": "testAuthToken",
+    "id": "LFdhbcNHx5zsMA7T4",
+    "token": "5BwhTeEXiTmU_8uKxGuy4pqWRHRP73QpJYmoSWfBpcB",
+    "tokenExpires": {
+      "$date": 1696418806422
+    },
     "type": "resume"
   }
 }

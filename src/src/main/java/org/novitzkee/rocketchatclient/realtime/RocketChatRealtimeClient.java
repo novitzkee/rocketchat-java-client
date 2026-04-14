@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.novitzkee.rocketchatclient.realtime.common.*;
 import org.novitzkee.rocketchatclient.realtime.json.CallIdAdapter;
+import org.novitzkee.rocketchatclient.realtime.json.InstantAdapter;
 import org.novitzkee.rocketchatclient.realtime.json.MessageTypeAdapter;
 import org.novitzkee.rocketchatclient.realtime.json.MethodNameAdapter;
 import org.novitzkee.rocketchatclient.realtime.message.Connect;
@@ -42,6 +43,7 @@ public class RocketChatRealtimeClient {
 
     private static final Moshi MOSHI = new Moshi.Builder()
             .add(new CallIdAdapter())
+            .add(new InstantAdapter())
             .add(new MessageTypeAdapter())
             .add(new MethodNameAdapter())
             .build();
