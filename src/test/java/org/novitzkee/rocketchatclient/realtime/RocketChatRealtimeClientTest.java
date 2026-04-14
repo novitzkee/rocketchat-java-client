@@ -28,19 +28,27 @@ import static org.novitzkee.rocketchatclient.util.MessageMatchers.methodCallWith
 
 class RocketChatRealtimeClientTest {
 
+    private static final Duration TEST_TIMEOUT_DURATION = Duration.ofMillis(200);
+
+    private static final Duration FAST_RESPONSE_DELAY = TEST_TIMEOUT_DURATION.dividedBy(4);
+
+    private static final Duration OVERDUE_RESPONSE_DELAY = TEST_TIMEOUT_DURATION.multipliedBy(10);
+
     private static final Executor SMALL_DELAY_EXECUTOR = CompletableFuture.delayedExecutor(
-            50,
+            FAST_RESPONSE_DELAY.toMillis(),
             TimeUnit.MILLISECONDS,
             Executors.newSingleThreadExecutor()
     );
 
     private static final Executor OVERDUE_DELAY_EXECUTOR = CompletableFuture.delayedExecutor(
-            1,
-            TimeUnit.SECONDS,
+            OVERDUE_RESPONSE_DELAY.toMillis(),
+            TimeUnit.MILLISECONDS,
             Executors.newSingleThreadExecutor()
     );
 
-    private static final Duration TEST_TIMEOUT_DURATION = Duration.ofMillis(200);
+    private static final Duration TIMEOUT_ASSERTION_WAIT = OVERDUE_RESPONSE_DELAY.multipliedBy(2);
+
+    private static final Duration FAST_CALL_GET_TIMEOUT = FAST_RESPONSE_DELAY.multipliedBy(10);
 
     private static final URI TEST_API_URL = URI.create("http://localhost:1234/websocket");
 
@@ -70,7 +78,7 @@ class RocketChatRealtimeClientTest {
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
 
         // when
-        rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // then
         final ArgumentCaptor<CharSequence> sentMessageCaptor = ArgumentCaptor.forClass(CharSequence.class);
@@ -93,7 +101,7 @@ class RocketChatRealtimeClientTest {
         final CompletableFuture<String> connectFuture = rocketChatRealtimeClient.connect();
 
         // then
-        await().atMost(2L, TimeUnit.SECONDS)
+        await().atMost(TIMEOUT_ASSERTION_WAIT.toMillis(), TimeUnit.MILLISECONDS)
                 .until(connectFuture::isDone);
 
         assertThatThrownBy(connectFuture::join).isInstanceOf(CompletionException.class)
@@ -105,7 +113,7 @@ class RocketChatRealtimeClientTest {
     void shouldSendPongMessageWhenPingReceivedAfterConnectionEstablished() throws Exception {
         // given
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
-        rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // when
         rocketChatWebSocketListener.onText(webSocketMock, PING_MESSAGE, true);
@@ -132,8 +140,8 @@ class RocketChatRealtimeClientTest {
         final Login login = Login.usingAuthenticationToken("test-token");
 
         // when
-        rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
-        final Login.Info result = rocketChatRealtimeClient.performMethodCall(login).get(1L, TimeUnit.SECONDS);
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        final Login.Info result = rocketChatRealtimeClient.performMethodCall(login).get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // then
         assertThat(result.id()).isNotBlank();
@@ -151,11 +159,11 @@ class RocketChatRealtimeClientTest {
         final Login login = Login.usingAuthenticationToken("test-token");
 
         // when
-        rocketChatRealtimeClient.connect().get(1L, TimeUnit.SECONDS);
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         final CompletableFuture<Login.Info> loginFuture = rocketChatRealtimeClient.performMethodCall(login);
 
         // then
-        await().atMost(2L, TimeUnit.SECONDS)
+        await().atMost(TIMEOUT_ASSERTION_WAIT.toMillis(), TimeUnit.MILLISECONDS)
                 .until(loginFuture::isDone);
 
         assertThatThrownBy(loginFuture::join).isInstanceOf(CompletionException.class)
