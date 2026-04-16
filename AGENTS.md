@@ -60,8 +60,8 @@ Detailed guidance for specific areas lives in `.agents/skills/`:
 | Skill | Path | Description |
 |-------|------|-------------|
 | Realtime Client | `.agents/skills/realtime-client/` | Architecture, conventions, and how-to for the DDP/WebSocket client |
-| REST Client | `.agents/skills/rest-client/` | (Planned) REST API client guidance |
-| DDP Protocol | `.agents/skills/ddp-protocol/` | (Planned) DDP protocol reference |
+| REST Client | `.agents/skills/rest-client/` | REST API client guidance |
+| DDP Protocol | `.agents/skills/ddp-protocol/` | DDP protocol reference |
 
 ## Important Notes
 

@@ -86,7 +86,7 @@ public class RocketChatRealtimeClient {
         return webSocket != null && !webSocket.isInputClosed() && !webSocket.isOutputClosed();
     }
 
-    @SneakyThrows
+    @SneakyThrows // TODO: Stop sneaky throwing InterruptedException.
     public CompletableFuture<String> connect() {
         // TODO: Verify if mutex will always be released.
         connectMutex.acquire();
@@ -161,7 +161,7 @@ public class RocketChatRealtimeClient {
         synchronousCallsInProgress.put(pendingCall.getId(), pendingCall);
 
         log.trace("Sending message: {}", outgoingMessage);
-        ws.sendText(outgoingMessage, true).join();
+        ws.sendText(outgoingMessage, true).join(); // TODO: Verify if joining here is a good idea.
 
         return pendingCall.getResult();
     }
