@@ -5,6 +5,18 @@
         </encoder>
     </appender>
 
+    <!-- Uncomment to log all outgoing websocket messages -->
+
+    <!--<logger name="org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeClient.webSocket.OUT" level="DEBUG">
+		<appender-ref ref="STDOUT" />
+	</logger>-->
+
+    <!-- Uncomment to log all incoming websocket messages -->
+
+    <!--<logger name="org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeClient.webSocket.IN" level="DEBUG">
+		<appender-ref ref="STDOUT" />
+	</logger>-->
+
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>

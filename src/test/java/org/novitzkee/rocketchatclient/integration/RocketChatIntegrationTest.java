@@ -23,6 +23,14 @@ public abstract class RocketChatIntegrationTest {
 
     private static final int ROCKET_CHAT_PORT = 3000;
 
+    static final String ADMIN_USERNAME = "admin";
+
+    static final String ADMIN_NAME = "Admin";
+
+    static final String ADMIN_EMAIL = "admin@example.com";
+
+    static final String ADMIN_PASSWORD = "admin123";
+
     static final MongoDBContainer MONGO_DB = new MongoDBContainer(MONGO_8)
             .withNetwork(NETWORK)
             .withNetworkAliases(MONGO_NETWORK_ALIAS)
@@ -35,7 +43,10 @@ public abstract class RocketChatIntegrationTest {
             .withExposedPorts(ROCKET_CHAT_PORT)
             .dependsOn(MONGO_DB)
             .withEnv("MONGO_URL", String.format("mongodb://%s:27017/rocketchat", MONGO_NETWORK_ALIAS))
-            .withEnv("MONGO_OPLOG_URL", String.format("mongodb://%s:27017/local", MONGO_NETWORK_ALIAS))
+            .withEnv("ADMIN_USERNAME", ADMIN_USERNAME)
+            .withEnv("ADMIN_NAME", ADMIN_NAME)
+            .withEnv("ADMIN_EMAIL", ADMIN_EMAIL)
+            .withEnv("ADMIN_PASS", ADMIN_PASSWORD)
             .waitingFor(
                     Wait.forHttp("/readyz")
                             .forStatusCode(200)

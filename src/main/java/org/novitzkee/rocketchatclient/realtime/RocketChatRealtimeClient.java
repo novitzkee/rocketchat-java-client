@@ -6,6 +6,7 @@ import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.novitzkee.rocketchatclient.realtime.common.*;
+import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
 import org.novitzkee.rocketchatclient.realtime.json.CallIdAdapter;
 import org.novitzkee.rocketchatclient.realtime.json.InstantAdapter;
 import org.novitzkee.rocketchatclient.realtime.json.MessageTypeAdapter;
@@ -13,8 +14,9 @@ import org.novitzkee.rocketchatclient.realtime.json.MethodNameAdapter;
 import org.novitzkee.rocketchatclient.realtime.message.Connect;
 import org.novitzkee.rocketchatclient.realtime.message.Pong;
 import org.novitzkee.rocketchatclient.realtime.util.PendingSynchronousCall;
-import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
 import org.novitzkee.rocketchatclient.realtime.util.WebSocketMessageBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -36,6 +38,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 // TODO: Review concurrency correctness in more detail.
 // TODO: Add recovery policy for connection failures.
 public class RocketChatRealtimeClient {
+
+    private static final String WEBSOCKET = ".webSocket.";
+
+    private static final Logger WEBSOCKET_OUT_LOGGER = LoggerFactory.getLogger(RocketChatRealtimeClient.class.getName() + WEBSOCKET + "OUT");
+
+    private static final Logger WEBSOCKET_IN_LOGGER = LoggerFactory.getLogger(RocketChatRealtimeClient.class.getName() + WEBSOCKET + "IN");
 
     private static final Duration DEFAULT_CALL_TIMEOUT = Duration.ofSeconds(10);
 
@@ -162,11 +170,14 @@ public class RocketChatRealtimeClient {
 
         log.trace("Sending message: {}", outgoingMessage);
         ws.sendText(outgoingMessage, true).join(); // TODO: Verify if joining here is a good idea.
+        WEBSOCKET_OUT_LOGGER.debug("{}: {}", this, outgoingMessage);
 
         return pendingCall.getResult();
     }
 
     private void receive(String message) {
+        WEBSOCKET_IN_LOGGER.debug("{}: {}", this, message);
+
         final String msg = DdpMessageType.DDP_MESSAGE_TYPE_PATH.read(message);
         final DdpMessageType ddpMessageType = DdpMessageType.of(msg);
 

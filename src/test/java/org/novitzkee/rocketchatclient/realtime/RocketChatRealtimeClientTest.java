@@ -8,7 +8,7 @@ import org.novitzkee.rocketchatclient.realtime.common.MethodName;
 import org.novitzkee.rocketchatclient.realtime.common.MethodResponse;
 import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
 import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeMethodCallException;
-import org.novitzkee.rocketchatclient.realtime.method.authentication.Login;
+import org.novitzkee.rocketchatclient.realtime.method.authentication.LoginMethodCall;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -137,11 +137,11 @@ class RocketChatRealtimeClientTest {
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
         setUpMethodResponse(SMALL_DELAY_EXECUTOR, MethodName.LOGIN, RocketChatRealtimeMessages::loginOkResponse);
 
-        final Login login = Login.usingAuthenticationToken("test-token");
+        final LoginMethodCall loginMethodCall = LoginMethodCall.usingAuthenticationToken("test-token");
 
         // when
         rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        final Login.Info result = rocketChatRealtimeClient.performMethodCall(login).get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        final LoginMethodCall.Info result = rocketChatRealtimeClient.performMethodCall(loginMethodCall).get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // then
         assertThat(result.id()).isNotBlank();
@@ -156,11 +156,11 @@ class RocketChatRealtimeClientTest {
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
         setUpMethodResponse(SMALL_DELAY_EXECUTOR, MethodName.LOGIN, RocketChatRealtimeMessages::loginErrorResponse);
 
-        final Login login = Login.usingAuthenticationToken("test-token");
+        final LoginMethodCall loginMethodCall = LoginMethodCall.usingAuthenticationToken("test-token");
 
         // when
         rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        final CompletableFuture<Login.Info> loginFuture = rocketChatRealtimeClient.performMethodCall(login);
+        final CompletableFuture<LoginMethodCall.Info> loginFuture = rocketChatRealtimeClient.performMethodCall(loginMethodCall);
 
         // then
         await().atMost(TIMEOUT_ASSERTION_WAIT.toMillis(), TimeUnit.MILLISECONDS)

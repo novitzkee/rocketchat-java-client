@@ -3,6 +3,7 @@ package org.novitzkee.rocketchatclient.integration;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeClient;
+import org.novitzkee.rocketchatclient.realtime.method.authentication.LoginMethodCall;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -24,15 +25,22 @@ class RocketChatRealtimeClientIT extends RocketChatIntegrationTest {
             )
             .build();
 
-
     @Test
-    void testConnect() {
+    void testLogin() {
+        // given
+        final LoginMethodCall loginMethodCall = LoginMethodCall.usingUsernameAndPassword(ADMIN_USERNAME, ADMIN_PASSWORD);
+
         // when
-        final String session = rocketChatRealtimeClient.connect()
-                .join();
+        final String session = rocketChatRealtimeClient.connect().join();
+        final LoginMethodCall.Info loginResult = rocketChatRealtimeClient.performMethodCall(loginMethodCall).join();
 
         // then
-        log.info("Login result: {}", session);
-        assertThat(session).isNotEmpty();
+        log.info("Session: {}", session);
+        log.info("Login result: {}", loginResult);
+
+        assertThat(loginResult.id()).isNotBlank();
+        assertThat(loginResult.token()).isNotBlank();
+        assertThat(loginResult.tokenExpires()).isNotNull();
+        assertThat(loginResult.type()).isNotNull();
     }
 }

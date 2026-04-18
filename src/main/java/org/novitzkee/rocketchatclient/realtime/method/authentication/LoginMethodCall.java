@@ -6,9 +6,9 @@ import org.novitzkee.rocketchatclient.realtime.common.MethodName;
 
 import java.time.Instant;
 
-public class Login extends MethodCall<Login.Info> {
+public class LoginMethodCall extends MethodCall<LoginMethodCall.Info> {
 
-    private Login(Object[] params) {
+    private LoginMethodCall(Object[] params) {
         super(MethodName.LOGIN, params);
     }
 
@@ -17,19 +17,19 @@ public class Login extends MethodCall<Login.Info> {
         return Info.class;
     }
 
-    public static Login usingUsernameAndPassword(String username, String password) {
+    public static LoginMethodCall usingUsernameAndPassword(String username, String password) {
         final User user = new User(username);
         final HashedPassword hashedPassword = new HashedPassword(DigestUtils.sha256Hex(password), "sha-256");
-        return new Login(new Object[]{new CredentialsParam(user, hashedPassword)});
+        return new LoginMethodCall(new Object[]{new CredentialsParam(user, hashedPassword)});
     }
 
-    public static Login usingAuthenticationToken(String authenticationToken) {
-        return new Login(new Object[]{new TokenParam(authenticationToken)});
+    public static LoginMethodCall usingAuthenticationToken(String authenticationToken) {
+        return new LoginMethodCall(new Object[]{new TokenParam(authenticationToken)});
     }
 
     public record TokenParam(String resume) { }
 
-    public record CredentialsParam(User user, HashedPassword hashedPassword) { }
+    public record CredentialsParam(User user, HashedPassword password) { }
 
     public record User(String username) { }
 
