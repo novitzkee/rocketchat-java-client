@@ -1,7 +1,6 @@
 package org.novitzkee.rocketchatclient.integration;
 
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -55,21 +54,24 @@ public abstract class RocketChatIntegrationTest {
             .withReuse(true);
     // Reuse in this case only prevents killing the container after tests finish to inspect/debug.
 
-    @BeforeAll
-    static void spinUpRocketChat() {
-        MONGO_DB.start();
-        ROCKET_CHAT.start();
-    }
-
     @SneakyThrows
     protected URI rocketChatHttpUrl() {
+        spinUpRocketChatIfNotStarted();
         final String uri = String.format("http://%s:%d/", ROCKET_CHAT.getHost(), ROCKET_CHAT.getMappedPort(ROCKET_CHAT_PORT));
         return new URI(uri);
     }
 
     @SneakyThrows
     protected URI rocketChatWebsocketUrl() {
+        spinUpRocketChatIfNotStarted();
         final String uri = String.format("ws://%s:%d/", ROCKET_CHAT.getHost(), ROCKET_CHAT.getMappedPort(ROCKET_CHAT_PORT));
         return new URI(uri);
+    }
+
+    private void spinUpRocketChatIfNotStarted() {
+        if (!ROCKET_CHAT.isRunning()) {
+            MONGO_DB.start();
+            ROCKET_CHAT.start();
+        }
     }
 }
