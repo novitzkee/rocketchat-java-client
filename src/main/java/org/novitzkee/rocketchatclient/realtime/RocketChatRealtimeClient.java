@@ -94,10 +94,16 @@ public class RocketChatRealtimeClient {
         return webSocket != null && !webSocket.isInputClosed() && !webSocket.isOutputClosed();
     }
 
-    @SneakyThrows // TODO: Stop sneaky throwing InterruptedException.
     public CompletableFuture<String> connect() {
         // TODO: Verify if mutex will always be released.
-        connectMutex.acquire();
+        try {
+            connectMutex.acquire();
+        } catch (InterruptedException e) {
+            log.warn("Interrupted while waiting for connect mutex", e);
+            Thread.currentThread().interrupt();
+            return CompletableFuture.failedFuture(e);
+        }
+
         return doConnect().whenComplete((v, e) -> connectMutex.release());
     }
 
