@@ -162,7 +162,7 @@ public class RocketChatRealtimeClient {
 
         final WebSocket ws = webSocket;
         if (ws == null) {
-            throw clientNotConnected();
+            return CompletableFuture.failedFuture(clientNotConnected());
         }
 
         final PendingSynchronousCall<?, T> pendingCall = PendingSynchronousCall.start(call);
