@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 // TODO: Review concurrency correctness in more detail.
 // TODO: Add recovery policy for connection failures.
+// TODO: Add call middleware.
 public class RocketChatRealtimeClient {
 
     private static final String WEBSOCKET = ".webSocket.";
