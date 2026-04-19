@@ -49,3 +49,15 @@ Core implementation class: `RocketChatRealtimeClient`
 - **Custom matchers:** `util/MessageMatchers` provides Mockito argument matchers for DDP JSON messages.
 - Use AssertJ for assertions, Awaitility for async waiting.
 
+## Integration Test Orchestration
+
+`RocketChatRealtimeClientIT` uses a two-phase gatekeeper pattern driven by annotations from the `orchestration` package:
+
+- **Phase 1 (`@AuthTestPhase`):** A single `@Nested` `AuthenticationTest` class runs first, sequentially. It connects and authenticates the shared `rocketChatRealtimeClient`. If any auth test fails, all Phase 2 classes are skipped automatically.
+- **Phase 2 (`@DomainTestPhase`):** Each domain (channels, rooms, messages, users, etc.) is a separate `@Nested` class annotated with `@DomainTestPhase`. These classes run **concurrently** after auth succeeds.
+
+When adding a new method, add its integration test to the existing `@DomainTestPhase` class for that domain,
+or create a new `@Nested @DomainTestPhase` class if the domain doesn't exist yet. 
+The outer class is `@TestInstance(PER_CLASS)` so all nested classes share the same authenticated client instance — no additional setup is needed.
+Each nested domain test should create resources to verify CRUD operations on that domain and use method order for the nested test class if it's necessary.
+
