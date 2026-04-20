@@ -116,7 +116,7 @@ public class RocketChatRealtimeClient {
     public CompletableFuture<Void> close() {
         log.info("Closing connection");
 
-        notifyConnectionError(connectionClosedByClientException());
+        notifyConnectionError(clientClosing());
 
         final WebSocket ws = webSocket;
         if (ws == null) {
@@ -287,7 +287,7 @@ public class RocketChatRealtimeClient {
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             log.info("Websocket connection closed with status code {} and reason {}", statusCode, reason);
-            notifyConnectionError(connectionClosedByServerException());
+            notifyConnectionError(connectionClosed());
             return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
         }
 
@@ -319,12 +319,12 @@ public class RocketChatRealtimeClient {
         return new RocketChatRealtimeClientException("Unexpectedly removed pending call");
     }
 
-    private static RocketChatRealtimeClientException connectionClosedByClientException() {
+    private static RocketChatRealtimeClientException clientClosing() {
         return new RocketChatRealtimeClientException(CLIENT_CLOSING_MESSAGE);
     }
 
-    private static RocketChatRealtimeClientException connectionClosedByServerException() {
-        return new RocketChatRealtimeClientException("Connection was closed by the server");
+    private static RocketChatRealtimeClientException connectionClosed() {
+        return new RocketChatRealtimeClientException("Connection was closed");
     }
 
     private static RocketChatRealtimeClientException webSocketError(Throwable cause) {
