@@ -109,7 +109,7 @@ public class RocketChatRealtimeClient {
     }
 
     public <T> CompletableFuture<T> performMethodCall(MethodCall<T> methodCall) {
-        methodCall.id(CallId.of(idCounter.incrementAndGet()));
+        methodCall.id(CallId.of(idCounter.getAndIncrement()));
         return performCall(methodCall);
     }
 

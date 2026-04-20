@@ -15,7 +15,7 @@ import org.novitzkee.rocketchatclient.realtime.common.SynchronousCall;
 @RequiredArgsConstructor
 public class Connect implements SynchronousCall<Connected, String>, DdpMessage {
 
-    public static final CallId CONNECT_MSG_ID = CallId.of(0);
+    public static final CallId CONNECT_MSG_ID = CallId.of(-1);
 
     private final DdpMessageType msg = DdpMessageType.CONNECT;
 
