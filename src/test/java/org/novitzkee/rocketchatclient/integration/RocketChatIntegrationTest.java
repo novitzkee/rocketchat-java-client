@@ -1,6 +1,7 @@
 package org.novitzkee.rocketchatclient.integration;
 
 import lombok.SneakyThrows;
+import org.apache.commons.lang3.StringUtils;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -54,6 +55,8 @@ public abstract class RocketChatIntegrationTest {
             .withReuse(true);
     // Reuse in this case only prevents killing the container after tests finish to inspect/debug.
 
+    private String adminAuthToken;
+
     @SneakyThrows
     protected URI rocketChatHttpUrl() {
         spinUpRocketChatIfNotStarted();
@@ -66,6 +69,22 @@ public abstract class RocketChatIntegrationTest {
         spinUpRocketChatIfNotStarted();
         final String uri = String.format("ws://%s:%d/", ROCKET_CHAT.getHost(), ROCKET_CHAT.getMappedPort(ROCKET_CHAT_PORT));
         return new URI(uri);
+    }
+
+    protected void setAdminAuthToken(String token) {
+        if (StringUtils.isBlank(token)) {
+            throw new IllegalArgumentException("Admin auth token cannot be blank");
+        }
+
+        this.adminAuthToken = token;
+    }
+
+    protected String adminAuthToken() {
+        if (StringUtils.isBlank(adminAuthToken)) {
+            throw new IllegalStateException("Admin auth token not set");
+        }
+
+        return adminAuthToken;
     }
 
     private void spinUpRocketChatIfNotStarted() {

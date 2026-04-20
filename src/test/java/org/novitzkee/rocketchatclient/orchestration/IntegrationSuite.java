@@ -2,6 +2,7 @@ package org.novitzkee.rocketchatclient.orchestration;
 
 import org.junit.jupiter.api.ClassOrderer;
 import org.junit.jupiter.api.TestClassOrder;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.lang.annotation.*;
@@ -44,5 +45,6 @@ import java.lang.annotation.*;
 @Inherited
 @ExtendWith(IntegrationSuiteOrchestrator.class)
 @TestClassOrder(ClassOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public @interface IntegrationSuite {
 }

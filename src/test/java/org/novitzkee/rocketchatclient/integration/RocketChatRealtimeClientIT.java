@@ -9,12 +9,10 @@ import org.novitzkee.rocketchatclient.realtime.method.authentication.LoginMethod
 
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationSuite
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RocketChatRealtimeClientIT extends RocketChatIntegrationTest {
 
     private static final String ROCKET_CHAT_REALTIME_API_PATH = "websocket";
@@ -31,11 +29,7 @@ class RocketChatRealtimeClientIT extends RocketChatIntegrationTest {
 
     @Nested
     @AuthTestPhase
-    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
     class AuthenticationTest {
-
-        private String token;
 
         @Test
         @Order(1)
@@ -64,16 +58,15 @@ class RocketChatRealtimeClientIT extends RocketChatIntegrationTest {
             assertThat(loginResult.tokenExpires()).isNotNull();
             assertThat(loginResult.type()).isEqualTo("password");
 
-            token = loginResult.token();
+            setAdminAuthToken(loginResult.token());
         }
 
         @Test
         @Order(3)
         void testLoginWithAuthenticationToken() {
-            Objects.requireNonNull(token, "Token must be set before this test can be executed.");
-
             // given
-            final LoginMethodCall loginWithAuthenticationTokenCall = LoginMethodCall.usingAuthenticationToken(token);
+            final LoginMethodCall loginWithAuthenticationTokenCall =
+                    LoginMethodCall.usingAuthenticationToken(adminAuthToken());
 
             // when
             final LoginMethodCall.Info loginResult =
