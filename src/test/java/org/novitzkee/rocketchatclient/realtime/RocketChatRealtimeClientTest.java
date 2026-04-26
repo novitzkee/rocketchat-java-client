@@ -120,14 +120,19 @@ class RocketChatRealtimeClientTest {
 
         // then
         final ArgumentCaptor<CharSequence> sentMessageCaptor = ArgumentCaptor.forClass(CharSequence.class);
-        verify(webSocketMock, times(2)).sendText(sentMessageCaptor.capture(), eq(true));
 
-        final List<CharSequence> sentMessages = sentMessageCaptor.getAllValues();
-
-        assertThat(sentMessages).hasSize(2)
-                .satisfiesExactly(
-                        firstMessage -> assertThat(firstMessage).isEqualToIgnoringWhitespace(CONNECT_MESSAGE),
-                        secondMessage -> assertThat(secondMessage).isEqualToIgnoringWhitespace(PONG_MESSAGE)
+        await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
+                .pollInterval(FAST_RESPONSE_DELAY.toMillis() / 5, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> {
+                            verify(webSocketMock, times(2)).sendText(sentMessageCaptor.capture(), eq(true));
+                            assertThat(sentMessageCaptor.getAllValues()).hasSize(2)
+                                    .satisfiesExactly(
+                                            firstMessage -> assertThat(firstMessage)
+                                                    .isEqualToIgnoringWhitespace(CONNECT_MESSAGE),
+                                            secondMessage -> assertThat(secondMessage)
+                                                    .isEqualToIgnoringWhitespace(PONG_MESSAGE)
+                                    );
+                        }
                 );
     }
 
@@ -141,7 +146,8 @@ class RocketChatRealtimeClientTest {
 
         // when
         rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        final LoginMethodCall.Info result = rocketChatRealtimeClient.performMethodCall(loginMethodCall).get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        final LoginMethodCall.Info result = rocketChatRealtimeClient.performMethodCall(loginMethodCall)
+                .get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // then
         assertThat(result.id()).isNotBlank();

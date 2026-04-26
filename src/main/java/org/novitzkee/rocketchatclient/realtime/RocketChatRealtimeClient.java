@@ -14,6 +14,7 @@ import org.novitzkee.rocketchatclient.realtime.json.MethodNameAdapter;
 import org.novitzkee.rocketchatclient.realtime.message.Connect;
 import org.novitzkee.rocketchatclient.realtime.message.Pong;
 import org.novitzkee.rocketchatclient.realtime.util.PendingSynchronousCall;
+import org.novitzkee.rocketchatclient.realtime.util.SerializingWebSocket;
 import org.novitzkee.rocketchatclient.realtime.util.WebSocketMessageBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +72,7 @@ public class RocketChatRealtimeClient {
     private final RocketChatWebSocketListener rocketChatWebSocketListener = new RocketChatWebSocketListener();
 
     @Setter(AccessLevel.PRIVATE)
-    private WebSocket webSocket;
+    private SerializingWebSocket webSocket;
 
     private volatile Exception connectionFailure;
 
@@ -118,13 +119,14 @@ public class RocketChatRealtimeClient {
 
         notifyConnectionError(clientClosing());
 
-        final WebSocket ws = webSocket;
+        final SerializingWebSocket ws = webSocket;
         if (ws == null) {
             return CompletableFuture.completedFuture(null);
         }
 
         setWebSocket(null);
         return ws.sendClose(WebSocket.NORMAL_CLOSURE, CLIENT_CLOSING_MESSAGE)
+                .whenComplete((ignored, ex) -> ws.shutdown())
                 .thenApply(ignored -> null);
     }
 
@@ -150,7 +152,7 @@ public class RocketChatRealtimeClient {
     private CompletableFuture<Void> establishWebSocketConnection() {
         return httpClient.newWebSocketBuilder()
                 .buildAsync(apiUrl, rocketChatWebSocketListener)
-                .thenAccept(this::setWebSocket);
+                .thenAccept(ws -> setWebSocket(new SerializingWebSocket(ws)));
     }
 
     private CompletableFuture<String> establishDdpConnection() {
@@ -160,7 +162,7 @@ public class RocketChatRealtimeClient {
     private <T> CompletableFuture<T> performCall(SynchronousCall<?, T> call) {
         final String outgoingMessage = MOSHI.<SynchronousCall<?, ?>>adapter(call.getClass()).toJson(call);
 
-        final WebSocket ws = webSocket;
+        final SerializingWebSocket ws = webSocket;
         if (ws == null) {
             return CompletableFuture.failedFuture(clientNotConnected());
         }
@@ -176,8 +178,8 @@ public class RocketChatRealtimeClient {
         synchronousCallsInProgress.put(pendingCall.getId(), pendingCall);
 
         log.trace("Sending message: {}", outgoingMessage);
-        ws.sendText(outgoingMessage, true).join(); // TODO: Verify if joining here is a good idea.
-        WEBSOCKET_OUT_LOGGER.debug("{}: {}", this, outgoingMessage);
+        ws.sendText(outgoingMessage, true)
+                .thenAccept(ignored -> WEBSOCKET_OUT_LOGGER.debug("{}: {}", this, outgoingMessage));
 
         return pendingCall.getResult();
     }
@@ -212,7 +214,7 @@ public class RocketChatRealtimeClient {
         if (isConnectionActive()) {
             final String pong = MOSHI.adapter(Pong.class).toJson(new Pong());
             log.trace("Sending pong message");
-            webSocket.sendText(pong, true).join();
+            webSocket.sendText(pong, true);
         }
     }
 
