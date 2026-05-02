@@ -1,8 +1,8 @@
-package org.novitzkee.rocketchatclient.realtime.util;
+package org.novitzkee.rocketchatclient.realtime.websocket.jdk;
 
 import java.util.function.Consumer;
 
-public class WebSocketMessageBuffer {
+public class JdkSocketMessageBuffer {
 
     private final StringBuilder messageBuffer = new StringBuilder();
 

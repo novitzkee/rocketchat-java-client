@@ -1,11 +1,14 @@
 package org.novitzkee.rocketchatclient.integration;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
 import org.novitzkee.rocketchatclient.orchestration.AuthTestPhase;
 import org.novitzkee.rocketchatclient.orchestration.DomainTestPhase;
 import org.novitzkee.rocketchatclient.orchestration.IntegrationSuite;
 import org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeClient;
 import org.novitzkee.rocketchatclient.realtime.method.authentication.LoginMethodCall;
+import org.novitzkee.rocketchatclient.realtime.websocket.jdk.JdkWebSocketProvider;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -17,14 +20,18 @@ class RocketChatRealtimeClientIT extends RocketChatIntegrationTest {
 
     private static final String ROCKET_CHAT_REALTIME_API_PATH = "websocket";
 
-    private final RocketChatRealtimeClient rocketChatRealtimeClient = RocketChatRealtimeClient.builder()
-            .apiUri(rocketChatWebsocketUrl().resolve(ROCKET_CHAT_REALTIME_API_PATH))
-            .callTimeoutDuration(Duration.ofSeconds(15))
+    private final JdkWebSocketProvider jdkWebSocketProvider = JdkWebSocketProvider.builder()
+            .webSocketUri(rocketChatWebsocketUrl().resolve(ROCKET_CHAT_REALTIME_API_PATH))
             .httpClient(
                     HttpClient.newBuilder()
                             .version(HttpClient.Version.HTTP_1_1)
                             .build()
             )
+            .build();
+
+    private final RocketChatRealtimeClient rocketChatRealtimeClient = RocketChatRealtimeClient.builder()
+            .callTimeoutDuration(Duration.ofSeconds(15))
+            .webSocketProvider(jdkWebSocketProvider)
             .build();
 
     @Nested

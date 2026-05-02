@@ -2,7 +2,10 @@ package org.novitzkee.rocketchatclient.realtime;
 
 import com.github.benmanes.caffeine.cache.*;
 import com.squareup.moshi.Moshi;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.novitzkee.rocketchatclient.realtime.common.*;
@@ -14,19 +17,15 @@ import org.novitzkee.rocketchatclient.realtime.json.MethodNameAdapter;
 import org.novitzkee.rocketchatclient.realtime.message.Connect;
 import org.novitzkee.rocketchatclient.realtime.message.Pong;
 import org.novitzkee.rocketchatclient.realtime.util.PendingSynchronousCall;
-import org.novitzkee.rocketchatclient.realtime.util.SerializingWebSocket;
-import org.novitzkee.rocketchatclient.realtime.util.WebSocketMessageBuffer;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocket;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocketListener;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocketProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.WebSocket;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -49,6 +48,8 @@ public class RocketChatRealtimeClient {
 
     private static final Duration DEFAULT_CALL_TIMEOUT = Duration.ofSeconds(10);
 
+    private static final Integer DEFAULT_MAX_PENDING_CALLS = 8;
+
     private static final String CLIENT_CLOSING_MESSAGE = "Client closing";
 
     private static final Moshi MOSHI = new Moshi.Builder()
@@ -58,41 +59,38 @@ public class RocketChatRealtimeClient {
             .add(new MethodNameAdapter())
             .build();
 
-    private final URI apiUrl;
-
-    private final Cache<@NonNull CallId, PendingSynchronousCall<?, ?>> synchronousCallsInProgress;
-
-    private final HttpClient httpClient;
-
     private final AtomicInteger idCounter = new AtomicInteger();
 
     private final Semaphore connectMutex = new Semaphore(1);
 
-    @Getter(AccessLevel.PACKAGE)
-    private final RocketChatWebSocketListener rocketChatWebSocketListener = new RocketChatWebSocketListener();
+    private final Cache<@NonNull CallId, PendingSynchronousCall<?, ?>> synchronousCallsInProgress;
 
-    private SerializingWebSocket webSocket;
+    private final WebSocketListener webSocketListener = new WebSocketListener();
+
+    private final RocketChatWebSocketProvider webSocketProvider;
+
+    @Setter(AccessLevel.PRIVATE)
+    private RocketChatWebSocket webSocket;
 
     private volatile Exception connectionFailure;
 
     @Builder
     private RocketChatRealtimeClient(
-            @NonNull URI apiUri,
-            @Nullable HttpClient httpClient,
-            @Nullable Duration callTimeoutDuration
+            @NonNull RocketChatWebSocketProvider webSocketProvider,
+            @Nullable Duration callTimeoutDuration,
+            @Nullable Integer maxPendingCalls
     ) {
-        this.apiUrl = apiUri;
-        this.httpClient = httpClient == null ? HttpClient.newHttpClient() : httpClient;
+        this.webSocketProvider = webSocketProvider;
         this.synchronousCallsInProgress = Caffeine.newBuilder()
                 .expireAfterWrite(callTimeoutDuration == null ? DEFAULT_CALL_TIMEOUT : callTimeoutDuration)
-                .maximumSize(1_000)
+                .maximumSize(maxPendingCalls == null ? DEFAULT_MAX_PENDING_CALLS : maxPendingCalls)
                 .removalListener(new PendingCallRemovalListener())
                 .scheduler(Scheduler.systemScheduler())
                 .build();
     }
 
     public boolean isConnectionActive() {
-        return webSocket != null && !webSocket.isInputClosed() && !webSocket.isOutputClosed();
+        return webSocket != null && webSocket.isConnectionActive();
     }
 
     public CompletableFuture<String> connect() {
@@ -117,19 +115,13 @@ public class RocketChatRealtimeClient {
 
         notifyConnectionError(clientClosing());
 
-        final SerializingWebSocket ws = webSocket;
+        final RocketChatWebSocket ws = webSocket;
         if (ws == null) {
             return CompletableFuture.completedFuture(null);
         }
 
         setWebSocket(null);
-        return ws.sendClose(WebSocket.NORMAL_CLOSURE, CLIENT_CLOSING_MESSAGE)
-                .whenComplete((ignored, ex) -> ws.shutdown())
-                .thenApply(ignored -> null);
-    }
-
-    private void setWebSocket(@Nullable WebSocket webSocket) {
-        this.webSocket = webSocket == null ? null : new SerializingWebSocket(webSocket);
+        return ws.close().thenApply(ignored -> null);
     }
 
     private CompletableFuture<String> doConnect() {
@@ -152,8 +144,7 @@ public class RocketChatRealtimeClient {
     }
 
     private CompletableFuture<Void> establishWebSocketConnection() {
-        return httpClient.newWebSocketBuilder()
-                .buildAsync(apiUrl, rocketChatWebSocketListener)
+        return webSocketProvider.createWebSocket(webSocketListener)
                 .thenAccept(this::setWebSocket);
     }
 
@@ -164,7 +155,7 @@ public class RocketChatRealtimeClient {
     private <T> CompletableFuture<T> performCall(SynchronousCall<?, T> call) {
         final String outgoingMessage = MOSHI.<SynchronousCall<?, ?>>adapter(call.getClass()).toJson(call);
 
-        final SerializingWebSocket ws = webSocket;
+        final RocketChatWebSocket ws = webSocket;
         if (ws == null) {
             return CompletableFuture.failedFuture(clientNotConnected());
         }
@@ -180,8 +171,7 @@ public class RocketChatRealtimeClient {
         synchronousCallsInProgress.put(pendingCall.getId(), pendingCall);
 
         log.trace("Sending message: {}", outgoingMessage);
-        ws.sendText(outgoingMessage, true)
-                .thenAccept(ignored -> WEBSOCKET_OUT_LOGGER.debug("{}: {}", this, outgoingMessage));
+        ws.send(outgoingMessage).thenAccept(ignored -> WEBSOCKET_OUT_LOGGER.debug("{}: {}", this, outgoingMessage));
 
         return pendingCall.getResult();
     }
@@ -216,7 +206,7 @@ public class RocketChatRealtimeClient {
         if (isConnectionActive()) {
             final String pong = MOSHI.adapter(Pong.class).toJson(new Pong());
             log.trace("Sending pong message");
-            webSocket.sendText(pong, true);
+            webSocket.send(pong);
         }
     }
 
@@ -255,51 +245,23 @@ public class RocketChatRealtimeClient {
         }
     }
 
-    class RocketChatWebSocketListener implements WebSocket.Listener {
-
-        private final WebSocketMessageBuffer messageBuffer = new WebSocketMessageBuffer();
+    private class WebSocketListener implements RocketChatWebSocketListener {
 
         @Override
-        public void onOpen(WebSocket webSocket) {
-            log.info("WebSocket connection opened");
-            WebSocket.Listener.super.onOpen(webSocket);
+        public void onMessage(String message) {
+            receive(message);
         }
 
         @Override
-        public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            messageBuffer.append(data);
-
-            if (last) {
-                messageBuffer.consumeMessage(RocketChatRealtimeClient.this::receive);
-            }
-
-            return WebSocket.Listener.super.onText(webSocket, data, last);
-        }
-
-        @Override
-        public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
-            log.trace("Websocket ping message received");
-            return WebSocket.Listener.super.onPing(webSocket, message);
-        }
-
-        @Override
-        public CompletionStage<?> onPong(WebSocket webSocket, ByteBuffer message) {
-            log.trace("Websocket pong message received");
-            return WebSocket.Listener.super.onPong(webSocket, message);
-        }
-
-        @Override
-        public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        public void onClose(int statusCode, String reason) {
             log.info("Websocket connection closed with status code {} and reason {}", statusCode, reason);
             notifyConnectionError(connectionClosed());
-            return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
         }
 
         @Override
-        public void onError(WebSocket webSocket, Throwable error) {
+        public void onError(Throwable error) {
             log.error("Websocket error received", error);
             notifyConnectionError(webSocketError(error));
-            WebSocket.Listener.super.onError(webSocket, error);
         }
     }
 

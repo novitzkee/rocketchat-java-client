@@ -1,6 +1,7 @@
-package org.novitzkee.rocketchatclient.realtime.util;
+package org.novitzkee.rocketchatclient.realtime.websocket.jdk;
 
 import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocket;
 
 import java.net.http.WebSocket;
 import java.util.concurrent.*;
@@ -14,42 +15,48 @@ import java.util.function.Function;
  * the constraint by funneling every {@code sendText} and {@code sendClose} call through a single-threaded
  * executor, regardless of how many threads call into it concurrently.
  */
-public class SerializingWebSocket {
+public class JdkSequentialSendWebSocket implements RocketChatWebSocket {
 
     private static final int SINGLE_THREAD = 1;
 
     // TODO: Make this value configurable (maybe make it consistent with max pending calls ?)
-    private static final int MAX_PENDING_SENDS = 1000;
+    private static final int MAX_PENDING_SENDS = 10;
 
-    private final WebSocket delegate;
+    private static final Function<Object, Void> OMIT_RESULT = o -> null;
+
+    private static final String CLIENT_CLOSING_MESSAGE = "Client closing";
 
     private final ExecutorService sendExecutor;
 
-    public SerializingWebSocket(WebSocket delegate) {
-        this.delegate = delegate;
+    private final WebSocket webSocket;
+
+    JdkSequentialSendWebSocket(WebSocket webSocket) {
+        this.webSocket = webSocket;
         this.sendExecutor = websocketDaemonThreadExecutor();
     }
 
-    public CompletableFuture<WebSocket> sendText(String text, boolean last) {
-        return CompletableFuture.supplyAsync(() -> delegate.sendText(text, last), sendExecutor)
-                .thenCompose(Function.identity());
+    @Override
+    public boolean isConnectionActive() {
+        return !webSocket.isInputClosed() && !webSocket.isOutputClosed();
     }
 
-    public CompletableFuture<WebSocket> sendClose(int statusCode, String reason) {
-        return CompletableFuture.supplyAsync(() -> delegate.sendClose(statusCode, reason), sendExecutor)
-                .thenCompose(Function.identity());
+    @Override
+    public CompletableFuture<Void> send(String message) {
+        return CompletableFuture.supplyAsync(
+                        () -> webSocket.sendText(message, true), sendExecutor
+                )
+                .thenCompose(Function.identity())
+                .thenApply(OMIT_RESULT);
     }
 
-    public boolean isInputClosed() {
-        return delegate.isInputClosed();
-    }
-
-    public boolean isOutputClosed() {
-        return delegate.isOutputClosed();
-    }
-
-    public void shutdown() {
-        sendExecutor.shutdown();
+    @Override
+    public CompletableFuture<Void> close() {
+        return CompletableFuture.supplyAsync(
+                        () -> webSocket.sendClose(WebSocket.NORMAL_CLOSURE, CLIENT_CLOSING_MESSAGE), sendExecutor
+                )
+                .thenCompose(Function.identity())
+                .thenApply(OMIT_RESULT)
+                .thenAccept(nothing -> sendExecutor.shutdown());
     }
 
     private static ExecutorService websocketDaemonThreadExecutor() {
@@ -73,7 +80,9 @@ public class SerializingWebSocket {
     }
 
     private static RejectedExecutionHandler sendQueueFullRejectionHandler() {
-        return (r, executor) -> { throw sendQueueFull(); };
+        return (r, executor) -> {
+            throw sendQueueFull();
+        };
     }
 
     private static RocketChatRealtimeClientException sendQueueFull() {

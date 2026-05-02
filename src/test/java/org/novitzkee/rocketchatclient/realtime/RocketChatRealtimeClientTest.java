@@ -9,10 +9,10 @@ import org.novitzkee.rocketchatclient.realtime.common.MethodResponse;
 import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeClientException;
 import org.novitzkee.rocketchatclient.realtime.exception.RocketChatRealtimeMethodCallException;
 import org.novitzkee.rocketchatclient.realtime.method.authentication.LoginMethodCall;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocket;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocketListener;
+import org.novitzkee.rocketchatclient.realtime.websocket.iface.RocketChatWebSocketProvider;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.WebSocket;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.*;
@@ -20,7 +20,6 @@ import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.novitzkee.rocketchatclient.realtime.RocketChatRealtimeMessages.*;
 import static org.novitzkee.rocketchatclient.util.MessageMatchers.ddpMessageOfType;
@@ -50,26 +49,23 @@ class RocketChatRealtimeClientTest {
 
     private static final Duration FAST_CALL_GET_TIMEOUT = FAST_RESPONSE_DELAY.multipliedBy(10);
 
-    private static final URI TEST_API_URL = URI.create("http://localhost:1234/websocket");
-
     private static final String CALL_TIMED_OUT = "call timed out";
-
-    private WebSocket webSocketMock;
 
     private RocketChatRealtimeClient rocketChatRealtimeClient;
 
-    private RocketChatRealtimeClient.RocketChatWebSocketListener rocketChatWebSocketListener;
+    private RocketChatWebSocket rocketChatWebSocketMock;
+
+    private RocketChatWebSocketListener rocketChatWebSocketListener;
 
     @BeforeEach
     void setUp() {
-        this.webSocketMock = createWebSocketMock();
-        this.rocketChatRealtimeClient = RocketChatRealtimeClient.builder()
-                .apiUri(TEST_API_URL)
-                .callTimeoutDuration(TEST_TIMEOUT_DURATION)
-                .httpClient(createHttpClientMock())
-                .build();
+        this.rocketChatWebSocketMock = mock(RocketChatWebSocket.class);
+        when(rocketChatWebSocketMock.isConnectionActive()).thenReturn(true);
 
-        this.rocketChatWebSocketListener = rocketChatRealtimeClient.getRocketChatWebSocketListener();
+        this.rocketChatRealtimeClient = RocketChatRealtimeClient.builder()
+                .callTimeoutDuration(TEST_TIMEOUT_DURATION)
+                .webSocketProvider(new TestWebSocketProvider())
+                .build();
     }
 
     @Test
@@ -95,10 +91,10 @@ class RocketChatRealtimeClientTest {
         rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // then
-        final ArgumentCaptor<CharSequence> sentMessageCaptor = ArgumentCaptor.forClass(CharSequence.class);
-        verify(webSocketMock).sendText(sentMessageCaptor.capture(), eq(true));
+        final ArgumentCaptor<String> sentMessageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(rocketChatWebSocketMock).send(sentMessageCaptor.capture());
 
-        final List<CharSequence> sentMessages = sentMessageCaptor.getAllValues();
+        final List<String> sentMessages = sentMessageCaptor.getAllValues();
 
         assertThat(sentMessages).hasSize(1)
                 .satisfiesExactly(
@@ -113,7 +109,7 @@ class RocketChatRealtimeClientTest {
         rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
         // when
-        rocketChatWebSocketListener.onText(webSocketMock, PING_MESSAGE, true);
+        rocketChatWebSocketListener.onMessage(PING_MESSAGE);
 
         // then
         await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
@@ -177,7 +173,7 @@ class RocketChatRealtimeClientTest {
         // then
         await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
                 .pollInterval(FAST_RESPONSE_DELAY.toMillis() / 5, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> verify(webSocketMock).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString()));
+                .untilAsserted(() -> verify(rocketChatWebSocketMock).close());
 
         await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
                 .pollInterval(FAST_RESPONSE_DELAY.toMillis() / 5, TimeUnit.MILLISECONDS)
@@ -247,24 +243,24 @@ class RocketChatRealtimeClientTest {
     }
 
     private void setUpConnectResponse(Executor executor) {
-        when(webSocketMock.sendText(ddpMessageOfType(DdpMessageType.CONNECT), eq(true))).thenAnswer(ignored -> {
-            executor.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, CONNECTED_MESSAGE, true));
-            return CompletableFuture.completedFuture(webSocketMock);
+        when(rocketChatWebSocketMock.send(ddpMessageOfType(DdpMessageType.CONNECT))).thenAnswer(ignored -> {
+            executor.execute(() -> rocketChatWebSocketListener.onMessage(CONNECTED_MESSAGE));
+            return CompletableFuture.completedFuture(rocketChatWebSocketMock);
         });
     }
 
     private void setUpMethodResponse(Executor executor, MethodName calledMethodName, ResponseProvider provider) {
-        when(webSocketMock.sendText(methodCallWithName(calledMethodName), eq(true))).thenAnswer(invocation -> {
+        when(rocketChatWebSocketMock.send(methodCallWithName(calledMethodName))).thenAnswer(invocation -> {
             final String request = invocation.getArgument(0);
             final String callId = MethodResponse.CALL_ID_PATH.read(request);
-            executor.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, provider.createForId(callId), true));
-            return CompletableFuture.completedFuture(webSocketMock);
+            executor.execute(() -> rocketChatWebSocketListener.onMessage(provider.createForId(callId)));
+            return CompletableFuture.completedFuture(rocketChatWebSocketMock);
         });
     }
 
     private void assertConnectAndPongMessageSent() {
-        final ArgumentCaptor<CharSequence> sentMessageCaptor = ArgumentCaptor.forClass(CharSequence.class);
-        verify(webSocketMock, times(2)).sendText(sentMessageCaptor.capture(), eq(true));
+        final ArgumentCaptor<String> sentMessageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(rocketChatWebSocketMock, times(2)).send(sentMessageCaptor.capture());
         assertThat(sentMessageCaptor.getAllValues()).hasSize(2)
                 .satisfiesExactly(
                         firstMessage -> assertThat(firstMessage).isEqualToIgnoringWhitespace(CONNECT_MESSAGE),
@@ -272,25 +268,17 @@ class RocketChatRealtimeClientTest {
                 );
     }
 
-    private WebSocket createWebSocketMock() {
-        final WebSocket wsMock = mock(WebSocket.class);
-        when(wsMock.isInputClosed()).thenReturn(false);
-        when(wsMock.isOutputClosed()).thenReturn(false);
-        when(wsMock.sendText(any(), anyBoolean())).thenReturn(CompletableFuture.completedFuture(wsMock));
-        return wsMock;
-    }
-
-    private HttpClient createHttpClientMock() {
-        final WebSocket.Builder webSocketBuilderMock = mock(WebSocket.Builder.class);
-        when(webSocketBuilderMock.buildAsync(any(), any())).thenReturn(CompletableFuture.completedFuture(webSocketMock));
-
-        final HttpClient httpClientMock = mock(HttpClient.class);
-        when(httpClientMock.newWebSocketBuilder()).thenReturn(webSocketBuilderMock);
-        return httpClientMock;
-    }
-
     @FunctionalInterface
     private interface ResponseProvider {
         String createForId(String callId);
+    }
+
+    private class TestWebSocketProvider implements RocketChatWebSocketProvider {
+
+        @Override
+        public CompletableFuture<RocketChatWebSocket> createWebSocket(RocketChatWebSocketListener listener) {
+            rocketChatWebSocketListener = listener;
+            return CompletableFuture.completedFuture(rocketChatWebSocketMock);
+        }
     }
 }
