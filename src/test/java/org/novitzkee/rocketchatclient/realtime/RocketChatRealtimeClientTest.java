@@ -73,6 +73,20 @@ class RocketChatRealtimeClientTest {
     }
 
     @Test
+    void shouldCompleteWithClientExceptionWhenNotConnected() {
+        // given
+        final LoginMethodCall loginMethodCall = LoginMethodCall.usingAuthenticationToken("test-token");
+
+        // when
+        final CompletableFuture<?> loginFuture = rocketChatRealtimeClient.performMethodCall(loginMethodCall);
+
+        // then
+        assertThatThrownBy(loginFuture::join).isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(RocketChatRealtimeClientException.class)
+                .hasMessageContaining("not connected");
+    }
+
+    @Test
     void shouldConnectToRocketChatRealtimeAPI() throws Exception {
         // given
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
@@ -93,6 +107,21 @@ class RocketChatRealtimeClientTest {
     }
 
     @Test
+    void shouldSendPongMessageWhenPingReceivedAfterConnectionEstablished() throws Exception {
+        // given
+        setUpConnectResponse(SMALL_DELAY_EXECUTOR);
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+        // when
+        rocketChatWebSocketListener.onText(webSocketMock, PING_MESSAGE, true);
+
+        // then
+        await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
+                .pollInterval(FAST_RESPONSE_DELAY.toMillis() / 5, TimeUnit.MILLISECONDS)
+                .untilAsserted(this::assertConnectAndPongMessageSent);
+    }
+
+    @Test
     void shouldCompleteWithClientExceptionWhenConnectResponseNotReceivedWithinSpecifiedTimeout() {
         // given
         setUpConnectResponse(OVERDUE_DELAY_EXECUTOR);
@@ -110,29 +139,62 @@ class RocketChatRealtimeClientTest {
     }
 
     @Test
-    void shouldSendPongMessageWhenPingReceivedAfterConnectionEstablished() throws Exception {
+    void shouldCompleteWithClientExceptionWhenLoginMethodResponseNotReceivedWithinSpecifiedTimeout() throws Exception {
         // given
         setUpConnectResponse(SMALL_DELAY_EXECUTOR);
-        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        setUpMethodResponse(OVERDUE_DELAY_EXECUTOR, MethodName.LOGIN, RocketChatRealtimeMessages::loginOkResponse);
+
+        final LoginMethodCall loginMethodCall = LoginMethodCall.usingAuthenticationToken("test-token");
 
         // when
-        rocketChatWebSocketListener.onText(webSocketMock, PING_MESSAGE, true);
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        final CompletableFuture<?> loginFuture = rocketChatRealtimeClient.performMethodCall(loginMethodCall);
 
         // then
-        final ArgumentCaptor<CharSequence> sentMessageCaptor = ArgumentCaptor.forClass(CharSequence.class);
+        await().atMost(TIMEOUT_ASSERTION_WAIT.toMillis(), TimeUnit.MILLISECONDS)
+                .until(loginFuture::isDone);
+
+        assertThatThrownBy(loginFuture::join).isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(RocketChatRealtimeClientException.class)
+                .hasMessageContaining(CALL_TIMED_OUT);
+    }
+
+    @Test
+    void shouldNotAcceptNewCallsAndFailAllPendingCallsWhenClosed() throws Exception {
+        // given
+        setUpConnectResponse(SMALL_DELAY_EXECUTOR);
+        setUpMethodResponse(OVERDUE_DELAY_EXECUTOR, MethodName.LOGIN, RocketChatRealtimeMessages::loginOkResponse);
+
+        final LoginMethodCall loginMethodCall = LoginMethodCall.usingAuthenticationToken("test-token");
+
+        // when
+        rocketChatRealtimeClient.connect().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+        final CompletableFuture<?> beforeCloseResult = rocketChatRealtimeClient.performMethodCall(loginMethodCall);
+        rocketChatRealtimeClient.close().get(FAST_CALL_GET_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        final CompletableFuture<?> afterCloseResult = rocketChatRealtimeClient.performMethodCall(loginMethodCall);
+
+        // then
+        await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
+                .pollInterval(FAST_RESPONSE_DELAY.toMillis() / 5, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> verify(webSocketMock).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString()));
 
         await().atMost(FAST_RESPONSE_DELAY.toMillis(), TimeUnit.MILLISECONDS)
                 .pollInterval(FAST_RESPONSE_DELAY.toMillis() / 5, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> {
-                            verify(webSocketMock, times(2)).sendText(sentMessageCaptor.capture(), eq(true));
-                            assertThat(sentMessageCaptor.getAllValues()).hasSize(2)
-                                    .satisfiesExactly(
-                                            firstMessage -> assertThat(firstMessage)
-                                                    .isEqualToIgnoringWhitespace(CONNECT_MESSAGE),
-                                            secondMessage -> assertThat(secondMessage)
-                                                    .isEqualToIgnoringWhitespace(PONG_MESSAGE)
-                                    );
-                        }
+                .until(() -> beforeCloseResult.isDone() && afterCloseResult.isDone());
+
+        assertThatThrownBy(beforeCloseResult::join).isInstanceOf(CompletionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                        RocketChatRealtimeClientException.class,
+                        e -> assertThat(e.getMessage()).contains("Client closing")
+                );
+
+        assertThatThrownBy(afterCloseResult::join).isInstanceOf(CompletionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                        RocketChatRealtimeClientException.class,
+                        e -> assertThat(e.getMessage()).contains("not connected")
                 );
     }
 
@@ -198,6 +260,16 @@ class RocketChatRealtimeClientTest {
             executor.execute(() -> rocketChatWebSocketListener.onText(webSocketMock, provider.createForId(callId), true));
             return CompletableFuture.completedFuture(webSocketMock);
         });
+    }
+
+    private void assertConnectAndPongMessageSent() {
+        final ArgumentCaptor<CharSequence> sentMessageCaptor = ArgumentCaptor.forClass(CharSequence.class);
+        verify(webSocketMock, times(2)).sendText(sentMessageCaptor.capture(), eq(true));
+        assertThat(sentMessageCaptor.getAllValues()).hasSize(2)
+                .satisfiesExactly(
+                        firstMessage -> assertThat(firstMessage).isEqualToIgnoringWhitespace(CONNECT_MESSAGE),
+                        secondMessage -> assertThat(secondMessage).isEqualToIgnoringWhitespace(PONG_MESSAGE)
+                );
     }
 
     private WebSocket createWebSocketMock() {
