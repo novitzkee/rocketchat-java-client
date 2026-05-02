@@ -71,7 +71,6 @@ public class RocketChatRealtimeClient {
     @Getter(AccessLevel.PACKAGE)
     private final RocketChatWebSocketListener rocketChatWebSocketListener = new RocketChatWebSocketListener();
 
-    @Setter(AccessLevel.PRIVATE)
     private SerializingWebSocket webSocket;
 
     private volatile Exception connectionFailure;
@@ -97,7 +96,6 @@ public class RocketChatRealtimeClient {
     }
 
     public CompletableFuture<String> connect() {
-        // TODO: Verify if mutex will always be released.
         try {
             connectMutex.acquire();
         } catch (InterruptedException e) {
@@ -130,6 +128,10 @@ public class RocketChatRealtimeClient {
                 .thenApply(ignored -> null);
     }
 
+    private void setWebSocket(@Nullable WebSocket webSocket) {
+        this.webSocket = webSocket == null ? null : new SerializingWebSocket(webSocket);
+    }
+
     private CompletableFuture<String> doConnect() {
         if (webSocket == null) {
             log.info("Connection not established, creating new one");
@@ -152,7 +154,7 @@ public class RocketChatRealtimeClient {
     private CompletableFuture<Void> establishWebSocketConnection() {
         return httpClient.newWebSocketBuilder()
                 .buildAsync(apiUrl, rocketChatWebSocketListener)
-                .thenAccept(ws -> setWebSocket(new SerializingWebSocket(ws)));
+                .thenAccept(this::setWebSocket);
     }
 
     private CompletableFuture<String> establishDdpConnection() {
